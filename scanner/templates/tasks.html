@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}扫描任务 · 安全扫描平台{% endblock %}
+{% block content %}
+<h1>扫描任务</h1>
+<div class="card">
+  <h2 style="margin-top:0">新建扫描</h2>
+  <form id="new-task">
+    <div class="toolbar">
+      <input name="name" placeholder="任务名称" style="width:220px" value="充电桩靶场自查">
+      <input name="target_url" placeholder="目标地址" style="width:280px" value="http://127.0.0.1:5000">
+      <label class="small muted">限速(请求/秒)</label>
+      <input name="rate_limit" type="number" value="8" min="1" max="50" style="width:80px">
+      <label class="small muted">最大页面</label>
+      <input name="max_pages" type="number" value="120" style="width:80px">
+      <label class="small muted"><input type="checkbox" name="crawl_spa" value="1" checked> SPA 动态抓取</label>
+    </div>
+    <div class="checkline">
+      {% for c in ['sqli','xss','ssrf','traversal','idor','bvac','info','redirect'] %}
+      <label><input type="checkbox" name="check_types" value="{{ c }}" checked>
+        {{ {'sqli':'SQL注入','xss':'XSS','ssrf':'SSRF','traversal':'路径穿越','idor':'水平越权','bvac':'垂直越权','info':'信息泄露','redirect':'开放重定向'}[c] }}</label>
+      {% endfor %}
+    </div>
+    <details style="margin-top:14px">
+      <summary class="muted small">角色账号配置(多角色登录,用于越权检测)</summary>
+      <textarea name="roles_json" rows="8" style="width:100%;margin-top:8px" class="mono">{{ default_roles|tojson(indent=2) }}</textarea>
+    </details>
+    <div style="margin-top:14px"><button class="btn-primary" type="submit">开始扫描</button>
+      <span class="muted small" style="margin-left:10px">预计 2~6 分钟,可随时暂停/续扫</span></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">任务列表 <span class="muted small">(自动刷新)</span></h2>
+  <table>
+    <thead><tr><th>#</th><th>名称</th><th>目标</th><th>状态</th><th style="width:220px">进度</th><th>请求</th><th>确认/疑似</th><th>资产</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    {% set t = r.task %}
+    <tr data-task="{{ t.id }}">
+      <td>{{ t.id }}</td>
+      <td><a href="/tasks/{{ t.id }}">{{ t.name }}</a></td>
+      <td class="mono small">{{ t.target_url }}</td>
+      <td><span class="tag {{ t.status }}" data-status>{{ t.status }}</span><div class="muted small" data-msg>{{ t.message[:60] }}</div></td>
+      <td><div class="progress"><i data-progress style="width:{{ t.progress }}%"></i></div><div class="muted small" data-progress-text>{{ t.progress }}% · {{ t.stage }}</div></td>
+      <td data-count>{{ t.request_count }}</td>
+      <td><span class="tag confirmed">{{ r.confirmed }}</span> / <span class="tag suspected">{{ r.suspected }}</span></td>
+      <td>{{ r.assets }}</td>
+      <td class="row">
+        <button class="btn-sm" data-act="pause" data-id="{{ t.id }}">暂停</button>
+        <button class="btn-sm" data-act="resume" data-id="{{ t.id }}">续扫</button>
+        <button class="btn-sm btn-warn" data-act="stop" data-id="{{ t.id }}">停止</button>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="empty">暂无任务,先建一个吧</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">埋点清单 <span class="muted small">共 {{ vuln_catalog|length }} 个已知漏洞</span></h2>
+  <table>
+    <thead><tr><th>ID</th><th>名称</th><th>类别</th><th>级别</th><th>位置</th></tr></thead>
+    <tbody>{% for k, v in vuln_catalog.items() %}
+      <tr><td class="mono">{{ k }}</td><td>{{ v.name }}</td><td>{{ v.category }}</td>
+      <td><span class="tag {{ v.severity }}">{{ v.severity }}</span></td><td class="muted mono small">{{ v.where }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('new-task').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  if (!fd.getAll('crawl_spa').length) fd.delete('crawl_spa');
+  const res = await fetch('/api/tasks', {method: 'POST', body: fd});
+  const data = await res.json();
+  if (data.ok) { toast('扫描任务已创建'); setTimeout(() => location.href = '/tasks/' + data.task_id, 600); }
+  else toast('创建失败');
+});
+
+document.querySelectorAll('[data-act]').forEach(btn => btn.addEventListener('click', async () => {
+  const r = await postJSON(`/api/tasks/${btn.dataset.id}/${btn.dataset.act}`);
+  if (r) toast(r.status === 'paused' ? '已暂停' : r.status === 'stopped' ? '已停止' : '已继续');
+}));
+
+async function refresh() {
+  const res = await fetch('/api/tasks');
+  const data = await res.json();
+  data.items.forEach(t => {
+    const row = document.querySelector(`tr[data-task="${t.id}"]`);
+    if (!row) return;
+    row.querySelector('[data-status]').textContent = t.status;
+    row.querySelector('[data-status]').className = 'tag ' + t.status;
+    row.querySelector('[data-msg]').textContent = (t.message || '').slice(0, 60);
+    row.querySelector('[data-progress]').style.width = t.progress + '%';
+    row.querySelector('[data-progress-text]').textContent = t.progress + '% · ' + (t.stage || '');
+    row.querySelector('[data-count]').textContent = t.request_count || 0;
+  });
+}
+setInterval(refresh, 2500);
+</script>
+{% endblock %}

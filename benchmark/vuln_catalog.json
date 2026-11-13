@@ -1,0 +1,132 @@
+{
+  "description": "充电桩运营后台靶场埋点清单:18 个已知漏洞(2 SQLi / 3 XSS / 2 SSRF / 2 路径穿越 / 4 水平越权 / 4 垂直越权 / 1 信息泄露)",
+  "count": 18,
+  "items": [
+    {
+      "id": "SQLI-01",
+      "name": "订单列表 SQL 注入",
+      "category": "sqli",
+      "severity": "critical",
+      "where": "GET /api/orders 参数 q / sort"
+    },
+    {
+      "id": "SQLI-02",
+      "name": "登录处 SQL 注入",
+      "category": "sqli",
+      "severity": "critical",
+      "where": "POST /api/auth/login username"
+    },
+    {
+      "id": "XSS-01",
+      "name": "帮助中心反射型 XSS",
+      "category": "xss",
+      "severity": "high",
+      "where": "GET /help/search keyword"
+    },
+    {
+      "id": "XSS-02",
+      "name": "工单存储型 XSS(公告页)",
+      "category": "xss",
+      "severity": "high",
+      "where": "POST /api/feedback content → GET /notice"
+    },
+    {
+      "id": "XSS-03",
+      "name": "用户档案存储型 XSS",
+      "category": "xss",
+      "severity": "high",
+      "where": "PUT /api/profile display_name → GET /profile/<id>"
+    },
+    {
+      "id": "SSRF-01",
+      "name": "场站封面 SSRF",
+      "category": "ssrf",
+      "severity": "high",
+      "where": "GET /api/stations/<id>/cover url"
+    },
+    {
+      "id": "SSRF-02",
+      "name": "合作方数据抓取 SSRF",
+      "category": "ssrf",
+      "severity": "high",
+      "where": "GET /api/integrations/fetch url"
+    },
+    {
+      "id": "TRAV-01",
+      "name": "发票附件路径穿越",
+      "category": "traversal",
+      "severity": "high",
+      "where": "GET /api/invoices/<id>/attachment file"
+    },
+    {
+      "id": "TRAV-02",
+      "name": "文件下载路径穿越",
+      "category": "traversal",
+      "severity": "high",
+      "where": "GET /api/files/download path"
+    },
+    {
+      "id": "IDOR-01",
+      "name": "订单详情 IDOR(水平)",
+      "category": "idor",
+      "severity": "high",
+      "where": "GET /api/orders/<id>"
+    },
+    {
+      "id": "IDOR-02",
+      "name": "发票详情 IDOR(水平)",
+      "category": "idor",
+      "severity": "high",
+      "where": "GET /api/invoices/<id>"
+    },
+    {
+      "id": "IDOR-03",
+      "name": "工单详情 IDOR(水平)",
+      "category": "idor",
+      "severity": "high",
+      "where": "GET /api/feedback/<id>"
+    },
+    {
+      "id": "IDOR-04",
+      "name": "用户档案 IDOR(水平)",
+      "category": "idor",
+      "severity": "high",
+      "where": "GET /api/users/<id>"
+    },
+    {
+      "id": "BAC-01",
+      "name": "用户列表越权(垂直)",
+      "category": "bvac",
+      "severity": "critical",
+      "where": "GET /api/admin/users 任意角色"
+    },
+    {
+      "id": "BAC-02",
+      "name": "API 密钥越权(垂直)",
+      "category": "bvac",
+      "severity": "critical",
+      "where": "GET /api/admin/api-keys 任意角色"
+    },
+    {
+      "id": "BAC-03",
+      "name": "运营结算越权(垂直)",
+      "category": "bvac",
+      "severity": "high",
+      "where": "GET /api/finance/settlements 非财务角色"
+    },
+    {
+      "id": "BAC-04",
+      "name": "个人资料批量赋值提权",
+      "category": "bvac",
+      "severity": "critical",
+      "where": "PUT /api/profile role=admin"
+    },
+    {
+      "id": "INFO-01",
+      "name": "调试配置未授权泄露",
+      "category": "info",
+      "severity": "high",
+      "where": "GET /api/debug/config"
+    }
+  ]
+}

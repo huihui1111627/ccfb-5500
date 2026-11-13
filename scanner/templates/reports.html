@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}报告 · 安全扫描平台{% endblock %}
+{% block content %}
+<h1>报告</h1>
+<div class="card">
+  <form class="toolbar" method="get">
+    <select name="task_id" onchange="this.form.submit()">
+      <option value="">选择任务</option>
+      {% for t in tasks_list %}<option value="{{ t.id }}" {{ 'selected' if task_id == t.id }}>#{{ t.id }} {{ t.name }}</option>{% endfor %}
+    </select>
+    {% if task_id %}
+    <button type="button" class="btn-primary" onclick="gen({{ task_id }})">重新生成</button>
+    <a class="btn" href="/reports/{{ task_id }}/html" target="_blank">打开 HTML</a>
+    <a class="btn" href="/reports/{{ task_id }}/json" target="_blank">打开 JSON</a>
+    <a class="btn" href="/reports/download/scan_{{ task_id }}.html">下载 HTML</a>
+    <a class="btn" href="/reports/download/scan_{{ task_id }}.json">下载 JSON</a>
+    {% endif %}
+  </form>
+  {% if data %}
+  <div class="kpis">
+    <div class="kpi"><div class="v">{{ data.metrics.detection_rate }}%</div><div class="l">检出率 {{ data.metrics.detected }}/{{ data.metrics.catalog_total }}</div></div>
+    <div class="kpi"><div class="v">{{ data.metrics.authz_rate }}%</div><div class="l">越权检出 {{ data.metrics.authz_detected }}/{{ data.metrics.authz_total }}</div></div>
+    <div class="kpi"><div class="v">{{ data.metrics.false_positive_rate }}%</div><div class="l">误报率</div></div>
+    <div class="kpi"><div class="v">{{ data.metrics.confirmed_count }}</div><div class="l">已确认漏洞</div></div>
+    <div class="kpi"><div class="v">{{ data.asset_count }}</div><div class="l">资产(接口 {{ data.api_count }})</div></div>
+  </div>
+  <h2>按类别统计</h2>
+  <table><thead><tr><th>类别</th><th>已确认数量</th></tr></thead>
+  <tbody>{% for k, v in data.by_category.items() %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</tbody></table>
+  <h2>埋点覆盖</h2>
+  <table><thead><tr><th>埋点</th><th>名称</th><th>结果</th></tr></thead>
+  <tbody>
+  {% for c in data.catalog %}
+    {% set hit = data.findings | selectattr('vuln_id', 'equalto', c.id) | selectattr('status', 'equalto', 'confirmed') | list %}
+    <tr><td class="mono">{{ c.id }}</td><td>{{ c.name }}</td>
+      <td>{% if hit %}<span class="tag confirmed">已检出</span>{% else %}<span class="tag false_positive">漏报</span>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody></table>
+  {% if data.metrics.missed %}<p class="muted small">漏报:{{ data.metrics.missed|join(', ') }}</p>{% endif %}
+  {% endif %}
+</div>
+<div class="card">
+  <h2 style="margin-top:0">报告文件</h2>
+  <table><thead><tr><th>文件</th><th>大小</th><th>操作</th></tr></thead>
+  <tbody>{% for f in files %}<tr><td class="mono small">{{ f.name }}</td><td>{{ (f.size / 1024)|round(1) }} KB</td>
+    <td><a href="/reports/download/{{ f.name }}">下载</a></td></tr>
+  {% else %}<tr><td colspan="3" class="empty">还没有报告</td></tr>{% endfor %}</tbody></table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function gen(id) {
+  const r = await postJSON(`/api/tasks/${id}/report`);
+  if (r && r.ok) { toast('报告已生成'); setTimeout(() => location.reload(), 700); }
+}
+</script>
+{% endblock %}

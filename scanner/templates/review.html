@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}复核 · 安全扫描平台{% endblock %}
+{% block content %}
+<h1>复核 <span class="muted small">自动复现结果 + 人工标误报</span></h1>
+<div class="card">
+  <form class="toolbar" method="get">
+    <select name="task_id" onchange="this.form.submit()">
+      <option value="">全部任务</option>
+      {% for t in tasks_list %}<option value="{{ t.id }}" {{ 'selected' if task_id == t.id }}>#{{ t.id }} {{ t.name }}</option>{% endfor %}
+    </select>
+    <span class="pill">待复核 {{ items|length }} 条</span>
+    <span class="pill">已抑制 {{ suppressed_count }} 条(下次扫描跳过)</span>
+  </form>
+  <p class="muted small">规则:疑似漏洞必须由验证器独立复现成功才算“已确认”;人工标为误报的 key 会写入抑制库,后续同主机扫描直接跳过。</p>
+</div>
+
+{% for it in items %}{% set f = it.f %}
+<div class="finding {{ 'open' if f.status == 'suspected' }}">
+  <div class="finding-h">
+    <h3>
+      <span class="tag {{ f.severity }}">{{ f.severity }}</span>
+      <span class="tag {{ f.status }}">{{ {'confirmed':'已确认','suspected':'待人工复核','false_positive':'误报'}[f.status] }}</span>
+      {{ f.title }}
+    </h3>
+    <div class="row">
+      <button class="btn-sm" onclick="reverify({{ f.id }})">复现验证</button>
+      <button class="btn-sm btn-danger" onclick="markFP({{ f.id }})">标为误报</button>
+      <button class="btn-sm" onclick="reopen({{ f.id }})">恢复</button>
+    </div>
+  </div>
+  <div class="finding-b">
+    <dl class="dl">
+      <dt>位置</dt><dd class="mono">{{ f.method }} {{ f.url }}</dd>
+      <dt>参数</dt><dd class="mono">{{ f.param or '-' }}</dd>
+      <dt>验证结论</dt><dd>{{ it.verification.reason or '未验证' }}{% if it.verification.confirmed %} <span class="tag confirmed">复现通过</span>{% else %} <span class="tag suspected">未复现</span>{% endif %}</dd>
+      {% if it.occurrences and it.occurrences|length > 1 %}
+      <dt>合并命中</dt><dd><ul class="occ">{% for o in it.occurrences %}<li>参数 <code>{{ o.param }}</code> · 载荷 <code>{{ o.payload }}</code></li>{% endfor %}</ul></dd>
+      {% endif %}
+    </dl>
+    {% if f.request %}<details><summary class="small muted">请求 / 响应原文</summary>
+      <pre class="req">{{ f.request }}</pre><pre>{{ f.response }}</pre>
+      {% if f.verify_request %}<pre class="req">{{ f.verify_request }}</pre><pre>{{ f.verify_response }}</pre>{% endif %}
+    </details>{% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card empty">没有待复核项。扫描完成后会自动进入复核队列。</div>
+{% endfor %}
+
+{% if suppressed %}
+<div class="card">
+  <h2 style="margin-top:0">误报抑制库</h2>
+  <table><thead><tr><th>dedup key</th><th>原因</th><th>标记时间</th></tr></thead>
+  <tbody>{% for s in suppressed %}<tr><td class="mono small">{{ s.key }}</td><td>{{ s.reason or '-' }}</td><td class="small">{{ s.at }}</td></tr>{% endfor %}</tbody></table>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+async function reverify(id) {
+  const r = await postJSON(`/api/findings/${id}/reverify`);
+  if (r) { toast(r.confirmed ? '复现成功,已确认' : '未能复现,保持疑似'); setTimeout(() => location.reload(), 800); }
+}
+async function markFP(id) {
+  const reason = prompt('误报原因(会记入抑制库)', '');
+  if (reason === null) return;
+  const r = await postJSON(`/api/findings/${id}/false-positive`, {reason});
+  if (r) { toast(r.message); setTimeout(() => location.reload(), 800); }
+}
+async function reopen(id) {
+  const r = await postJSON(`/api/findings/${id}/reopen`);
+  if (r) { toast('已恢复'); setTimeout(() => location.reload(), 600); }
+}
+</script>
+{% endblock %}

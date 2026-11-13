@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>用户档案 - {{ user.username }}</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body><div class="view" style="max-width:760px;margin:40px auto">
+<div class="card">
+  <h2>用户档案</h2>
+  <!-- 漏洞:display_name 以 safe 输出,构成存储型 XSS -->
+  <h3>{{ user.display_name|safe }}</h3>
+  <dl class="dl">
+    <dt>用户名</dt><dd>{{ user.username }}</dd>
+    <dt>角色</dt><dd>{{ user.role }}</dd>
+    <dt>邮箱</dt><dd>{{ user.email }}</dd>
+    <dt>手机</dt><dd>{{ user.phone }}</dd>
+    <dt>余额</dt><dd>¥{{ '%.2f'|format(user.balance) }}</dd>
+  </dl>
+  <p class="muted small"><a href="/app">返回工作台</a></p>
+</div></div></body></html>

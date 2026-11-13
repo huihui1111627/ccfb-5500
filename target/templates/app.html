@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>充电桩运营后台</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="side-brand"><span class="logo">⚡</span> ChargeOps</div>
+    <nav id="nav">
+      <a data-view="dashboard" class="active">📊 运营概览</a>
+      <a data-view="orders">🧾 订单管理</a>
+      <a data-view="stations">📍 场站管理</a>
+      <a data-view="invoices">💳 发票管理</a>
+      <a data-view="feedback">🎫 客服工单</a>
+      <a data-view="users">👥 用户管理</a>
+      <a data-view="settlement">🏦 运营结算</a>
+      <a data-view="tools">🔧 系统工具</a>
+      <a data-view="profile">👤 个人中心</a>
+    </nav>
+    <div class="side-foot">
+      <div class="side-user">
+        <span class="avatar" id="side-avatar">-</span>
+        <div>
+          <div id="side-name">-</div>
+          <div class="muted small" id="side-role">-</div>
+        </div>
+      </div>
+      <button class="btn-link" id="logout">退出登录</button>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <h1 id="view-title">运营概览</h1>
+      <div class="topbar-right">
+        <span class="pill" id="role-pill"></span>
+        <span id="clock"></span>
+      </div>
+    </header>
+    <section id="view" class="view"></section>
+  </main>
+</div>
+<div id="modal-root"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

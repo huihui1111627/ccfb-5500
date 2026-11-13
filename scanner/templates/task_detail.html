@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}任务 #{{ task.id }} · 安全扫描平台{% endblock %}
+{% block content %}
+<h1>{{ task.name }} <span class="muted small">#{{ task.id }}</span></h1>
+<div class="kpis">
+  <div class="kpi"><div class="v" id="k-status">{{ task.status }}</div><div class="l">状态</div></div>
+  <div class="kpi"><div class="v" id="k-progress">{{ task.progress }}%</div><div class="l">进度 · <span id="k-stage">{{ task.stage }}</span></div></div>
+  <div class="kpi"><div class="v" id="k-confirmed">-</div><div class="l">已确认漏洞</div></div>
+  <div class="kpi"><div class="v" id="k-suspected">-</div><div class="l">疑似</div></div>
+  <div class="kpi"><div class="v" id="k-assets">-</div><div class="l">资产</div></div>
+  <div class="kpi"><div class="v" id="k-requests">{{ task.request_count }}</div><div class="l">请求数</div></div>
+</div>
+<div class="card">
+  <div class="progress" style="margin-bottom:10px"><i id="bar" style="width:{{ task.progress }}%"></i></div>
+  <div class="row" style="justify-content:space-between">
+    <div class="muted small" id="msg">{{ task.message }}</div>
+    <div class="row">
+      <button data-act="pause" class="btn-sm">暂停</button>
+      <button data-act="resume" class="btn-sm btn-primary">续扫</button>
+      <button data-act="stop" class="btn-sm btn-warn">停止</button>
+      <a class="btn btn-sm" href="/findings?task_id={{ task.id }}">查看漏洞</a>
+      <a class="btn btn-sm" href="/review?task_id={{ task.id }}">去复核</a>
+      <a class="btn btn-sm" href="/reports?task_id={{ task.id }}">看报告</a>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h2 style="margin-top:0">扫描阶段</h2>
+  <table>
+    <thead><tr><th>阶段</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>login</td><td>多角色登录,建立 4 套会话</td></tr>
+      <tr><td>crawl</td><td>带登录态爬全站 + Playwright 抓 SPA 接口</td></tr>
+      <tr><td>inject</td><td>SQL 注入、XSS、SSRF、路径穿越、信息泄露、开放重定向</td></tr>
+      <tr><td>authz</td><td>换角色重放,水平/垂直越权、批量赋值提权</td></tr>
+      <tr><td>verify</td><td>对疑似漏洞独立复现,通过才标确认</td></tr>
+      <tr><td>report</td><td>导出 HTML / JSON 报告</td></tr>
+    </tbody>
+  </table>
+  <p class="muted small">暂停后会保留断点,点“续扫”从未完成阶段继续,不会重复已完成阶段。</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const tid = {{ task.id }};
+async function poll() {
+  const res = await fetch(`/api/tasks/${tid}/status`);
+  const d = await res.json();
+  document.getElementById('k-status').textContent = d.status;
+  document.getElementById('k-progress').textContent = d.progress + '%';
+  document.getElementById('k-stage').textContent = d.stage || '-';
+  document.getElementById('bar').style.width = d.progress + '%';
+  document.getElementById('msg').textContent = d.message || '';
+  document.getElementById('k-confirmed').textContent = d.counts.confirmed;
+  document.getElementById('k-suspected').textContent = d.counts.suspected;
+  document.getElementById('k-assets').textContent = d.counts.assets;
+  document.getElementById('k-requests').textContent = d.request_count;
+}
+document.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
+  const r = await postJSON(`/api/tasks/${tid}/${b.dataset.act}`);
+  if (r) toast(r.status);
+  poll();
+});
+poll(); setInterval(poll, 1500);
+</script>
+{% endblock %}

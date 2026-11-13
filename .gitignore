@@ -16,3 +16,8 @@ node_modules/
 __pycache__/
 .venv/
 venv/
+
+# 运行时数据
+scanner/data/
+scanner/reports/
+target/data/

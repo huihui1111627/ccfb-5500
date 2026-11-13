@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}资产 · 安全扫描平台{% endblock %}
+{% block content %}
+<h1>资产</h1>
+<div class="card">
+  <form class="toolbar" method="get">
+    <select name="task_id">
+      <option value="">全部任务</option>
+      {% for t in tasks_list %}<option value="{{ t.id }}" {{ 'selected' if task_id == t.id }}>#{{ t.id }} {{ t.name }}</option>{% endfor %}
+    </select>
+    <select name="kind">
+      <option value="">全部类型</option>
+      {% for k in ['page','api','form','spa-api','asset'] %}<option value="{{ k }}" {{ 'selected' if kind == k }}>{{ k }}</option>{% endfor %}
+    </select>
+    <button class="btn-primary">筛选</button>
+    <span class="muted small">共 {{ assets|length }} 条(最多显示 500)</span>
+  </form>
+  <table>
+    <thead><tr><th>#</th><th>方法</th><th>URL</th><th>类型</th><th>来源</th><th>发现角色</th><th>参数</th></tr></thead>
+    <tbody>
+    {% for a in assets %}
+      <tr>
+        <td>{{ a.id }}</td><td class="mono">{{ a.method }}</td>
+        <td class="mono small" style="word-break:break-all">{{ a.url }}</td>
+        <td><span class="tag suspected">{{ a.kind }}</span></td>
+        <td class="small">{{ a.source }}</td><td class="small">{{ a.role or '-' }}</td>
+        <td class="mono small">{{ (a.params | fromjson | map(attribute='name') | join(', ')) if a.params else '-' }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="empty">暂无资产,先跑一个扫描任务</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

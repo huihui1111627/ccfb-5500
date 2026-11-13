@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}安全扫描平台{% endblock %}</title>
+<style>
+:root { --c: #14607a; --bg: #f4f6fa; --line: #e6eaf2; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: #1f2937; }
+a { color: var(--c); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.top { background: #0f2537; color: #c7d6e6; display: flex; align-items: center; gap: 28px; padding: 0 28px; height: 56px; }
+.top .brand { color: #fff; font-weight: 700; font-size: 16px; }
+.top nav { display: flex; gap: 6px; }
+.top nav a { color: #a9bfd2; padding: 8px 14px; border-radius: 8px; font-size: 14px; }
+.top nav a:hover { background: #17364f; text-decoration: none; }
+.top nav a.active { background: var(--c); color: #fff; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 28px 60px; }
+h1 { font-size: 22px; margin: 0 0 18px; }
+h2 { font-size: 16px; margin: 26px 0 12px; }
+.card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(16,24,40,.06); margin-bottom: 18px; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+input, select, textarea { padding: 8px 11px; border: 1px solid #d7dce6; border-radius: 8px; font-size: 13px; font-family: inherit; }
+button, .btn { background: #eef1f6; border: 0; border-radius: 8px; padding: 9px 16px; cursor: pointer; font-size: 13px; color: #1f2937; }
+button:hover { filter: brightness(.96); }
+.btn-primary { background: var(--c); color: #fff; }
+.btn-danger { background: #fde8e8; color: #b91c1c; }
+.btn-warn { background: #fff4e5; color: #b45309; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #f1f4f9; vertical-align: top; }
+th { color: #6b7280; font-weight: 500; background: #fafbfd; }
+tr:hover td { background: #fafcff; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
+.tag.critical { background: #fde8e8; color: #b91c1c; }
+.tag.high { background: #fff1e6; color: #c2410c; }
+.tag.medium { background: #fff7e0; color: #b45309; }
+.tag.low { background: #eef1f6; color: #4b5563; }
+.tag.confirmed { background: #e7f7ef; color: #047857; }
+.tag.suspected { background: #eef1f6; color: #6b7280; }
+.tag.false_positive { background: #fde8e8; color: #b91c1c; }
+.tag.running { background: #e0f2fe; color: #0369a1; }
+.tag.completed { background: #e7f7ef; color: #047857; }
+.tag.paused { background: #fff4e5; color: #b45309; }
+.tag.stopped { background: #eef1f6; color: #6b7280; }
+.tag.failed { background: #fde8e8; color: #b91c1c; }
+.tag.pending { background: #eef1f6; color: #6b7280; }
+.muted { color: #8a93a5; }
+.small { font-size: 12px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+pre { background: #0f2537; color: #d8e6f2; padding: 12px; border-radius: 8px; font-size: 11.5px; overflow: auto; max-height: 380px; white-space: pre-wrap; word-break: break-all; }
+pre.req { background: #19301f; color: #d8f0dd; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(16,24,40,.06); }
+.kpi .v { font-size: 24px; font-weight: 700; color: var(--c); }
+.kpi .l { font-size: 12px; color: #6b7280; margin-top: 2px; }
+.progress { height: 8px; background: #eef1f6; border-radius: 999px; overflow: hidden; }
+.progress > i { display: block; height: 100%; background: linear-gradient(90deg, #14607a, #1f9d86); transition: width .4s; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.row { display: flex; gap: 12px; align-items: center; }
+.pill { background: #e8f5f1; color: #0f766e; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+.finding { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; }
+.finding-h { padding: 12px 16px; display: flex; justify-content: space-between; gap: 12px; align-items: center; background: #f9fbfd; border-radius: 10px 10px 0 0; cursor: pointer; }
+.finding-h h3 { margin: 0; font-size: 14px; }
+.finding-b { padding: 14px 16px; border-top: 1px solid var(--line); display: none; }
+.finding.open .finding-b { display: block; }
+.dl { display: grid; grid-template-columns: 92px 1fr; gap: 6px 12px; font-size: 13px; margin: 0 0 12px; }
+.dl dt { color: #6b7280; }
+.dl dd { margin: 0; word-break: break-all; }
+ul.occ { margin: 4px 0; padding-left: 20px; }
+.checkline { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; }
+.checkline label { display: flex; gap: 5px; align-items: center; }
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #0f2537; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; z-index: 99; }
+.empty { text-align: center; padding: 36px; color: #8a93a5; }
+details summary { cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand">🛡 ChargeOps Scanner</div>
+  <nav>
+    <a href="/tasks" class="{{ 'active' if request.path.startswith('/tasks') or request.path == '/' }}">扫描任务</a>
+    <a href="/assets" class="{{ 'active' if request.path.startswith('/assets') }}">资产</a>
+    <a href="/findings" class="{{ 'active' if request.path.startswith('/findings') }}">漏洞</a>
+    <a href="/review" class="{{ 'active' if request.path.startswith('/review') }}">复核</a>
+    <a href="/reports" class="{{ 'active' if request.path.startswith('/reports') }}">报告</a>
+  </nav>
+</div>
+<div class="wrap">
+{% block content %}{% endblock %}
+</div>
+<script>
+function toast(msg) { const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); }
+async function postJSON(url, body) {
+  const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})});
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { toast(data.error || ('HTTP ' + res.status)); return null; }
+  return data;
+}
+document.addEventListener('click', (e) => {
+  const head = e.target.closest('.finding-h');
+  if (head && !e.target.closest('button, a')) head.parentElement.classList.toggle('open');
+});
+</script>
+{% block scripts %}{% endblock %}
+</body></html>

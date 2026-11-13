@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>公告 - ChargeOps</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body><div class="view" style="max-width:900px;margin:40px auto">
+<div class="card">
+  <h2>站点公告 · 待处理工单</h2>
+  <ul class="notices">
+  {% for f in items %}
+    <!-- 漏洞:content 使用 safe 输出,构成存储型 XSS -->
+    <li class="notice-item"><span class="tag warn">{{ f.category }}</span> {{ f.content|safe }}</li>
+  {% endfor %}
+  </ul>
+  <p class="muted small">以上问题由车主反馈,请运营及时处理。</p>
+</div></div></body></html>

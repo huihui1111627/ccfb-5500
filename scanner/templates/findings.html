@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}漏洞 · 安全扫描平台{% endblock %}
+{% block content %}
+<h1>漏洞</h1>
+<div class="card">
+  <form class="toolbar" method="get">
+    <select name="task_id">
+      <option value="">全部任务</option>
+      {% for t in tasks_list %}<option value="{{ t.id }}" {{ 'selected' if task_id == t.id }}>#{{ t.id }} {{ t.name }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="">全部状态</option>
+      <option value="confirmed" {{ 'selected' if status == 'confirmed' }}>已确认</option>
+      <option value="suspected" {{ 'selected' if status == 'suspected' }}>疑似</option>
+      <option value="false_positive" {{ 'selected' if status == 'false_positive' }}>已标误报</option>
+    </select>
+    <select name="category">
+      <option value="">全部类型</option>
+      {% for c in categories %}<option value="{{ c }}" {{ 'selected' if category == c }}>{{ c }}</option>{% endfor %}
+    </select>
+    <button class="btn-primary">筛选</button>
+  </form>
+  {% if metrics %}
+  <div class="kpis">
+    <div class="kpi"><div class="v">{{ metrics.detection_rate }}%</div><div class="l">检出率 {{ metrics.detected }}/{{ metrics.catalog_total }}</div></div>
+    <div class="kpi"><div class="v">{{ metrics.authz_rate }}%</div><div class="l">越权检出 {{ metrics.authz_detected }}/{{ metrics.authz_total }}</div></div>
+    <div class="kpi"><div class="v">{{ metrics.confirmed_count }}</div><div class="l">已确认</div></div>
+    <div class="kpi"><div class="v">{{ metrics.false_positive_rate }}%</div><div class="l">误报率</div></div>
+    <div class="kpi"><div class="v">{{ metrics.missed|length }}</div><div class="l">漏报</div></div>
+  </div>
+  {% endif %}
+  <table>
+    <thead><tr><th>#</th><th>埋点</th><th>类型</th><th>级别</th><th>标题</th><th>参数</th><th>角色</th><th>状态</th><th>命中</th></tr></thead>
+    <tbody>
+    {% for it in items %}{% set f = it.f %}
+      <tr>
+        <td>{{ f.id }}</td><td class="mono small">{{ f.vuln_id or '-' }}</td>
+        <td class="small">{{ f.category }}</td>
+        <td><span class="tag {{ f.severity }}">{{ f.severity }}</span></td>
+        <td><a href="#" onclick="document.getElementById('f-{{ f.id }}').classList.add('open');return false">{{ f.title }}</a>
+            <div class="muted small">{{ it.verification.reason or '' }}</div></td>
+        <td class="mono small">{{ f.param or '-' }}</td>
+        <td class="small">{{ f.role or '-' }}</td>
+        <td><span class="tag {{ f.status }}">{{ {'confirmed':'已确认','suspected':'疑似','false_positive':'误报'}[f.status] }}</span></td>
+        <td>{{ it.occurrences|length if it.occurrences else 1 }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="9" class="empty">暂无漏洞记录</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% for it in items %}{% set f = it.f %}
+<div class="finding" id="f-{{ f.id }}">
+  <div class="finding-h">
+    <h3><span class="tag {{ f.severity }}">{{ f.severity }}</span> {{ f.title }}</h3>
+    <div class="row">
+      <span class="tag {{ f.status }}">{{ {'confirmed':'已确认','suspected':'疑似','false_positive':'误报'}[f.status] }}</span>
+      {% if f.vuln_id %}<span class="tag low">{{ f.vuln_id }}</span>{% endif %}
+      <button class="btn-sm" onclick="reverify({{ f.id }})">重新验证</button>
+      <button class="btn-sm btn-danger" onclick="markFP({{ f.id }})">标为误报</button>
+    </div>
+  </div>
+  <div class="finding-b">
+    <dl class="dl">
+      <dt>位置</dt><dd class="mono">{{ f.method }} {{ f.url }}</dd>
+      <dt>参数 / 角色</dt><dd>{{ f.param or '-' }} / {{ f.role or '-' }}</dd>
+      <dt>判定依据</dt><dd>{{ it.verification.reason or '-' }}</dd>
+      {% if it.occurrences and it.occurrences|length > 1 %}
+      <dt>合并命中</dt><dd><ul class="occ">{% for o in it.occurrences %}<li>参数 <code>{{ o.param }}</code> · 载荷 <code>{{ o.payload }}</code></li>{% endfor %}</ul></dd>
+      {% endif %}
+    </dl>
+    <h3 class="small">触发请求</h3><pre class="req">{{ f.request }}</pre>
+    <h3 class="small">响应原文</h3><pre>{{ f.response }}</pre>
+    {% if f.verify_request %}<h3 class="small">复现请求 / 响应</h3><pre class="req">{{ f.verify_request }}</pre><pre>{{ f.verify_response }}</pre>{% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
+{% block scripts %}
+<script>
+async function revert(id) {
+  const r = await postJSON(`/api/findings/${id}/reverify`);
+  if (r) toast(r.confirmed ? '复现成功,已确认' : '未能复现');
+}
+function reverify(id) { revert(id).then(() => setTimeout(() => location.reload(), 800)); }
+async function markFP(id) {
+  const reason = prompt('误报原因(可留空)', '');
+  if (reason === null) return;
+  const r = await postJSON(`/api/findings/${id}/false-positive`, {reason});
+  if (r) { toast(r.message); setTimeout(() => location.reload(), 700); }
+}
+</script>
+{% endblock %}

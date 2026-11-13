@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>帮助中心 - 搜索</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body><div class="view" style="max-width:900px;margin:40px auto">
+<div class="card">
+  <h2>帮助中心搜索</h2>
+  <form method="get" action="/help/search" class="toolbar">
+    <input name="keyword" value="{{ keyword }}" placeholder="搜索场站、充电问题" style="flex:1">
+    <button class="btn-primary">搜索</button>
+  </form>
+  <!-- 漏洞:keyword 使用 safe 直接输出 -->
+  <p>您搜索的关键词:<strong>{{ keyword|safe }}</strong></p>
+  {% if results %}
+  <table class="table"><thead><tr><th>场站</th><th>地址</th><th>状态</th></tr></thead>
+  <tbody>{% for r in results %}<tr><td>{{ r.name }}</td><td>{{ r.address }}</td><td>{{ r.status }}</td></tr>{% endfor %}</tbody></table>
+  {% elif keyword %}<p class="muted">未找到相关结果。</p>{% endif %}
+  <p class="muted small">常见问题:如何开票 · 充电失败如何处理 · 退款到账时间</p>
+</div></div></body></html>
