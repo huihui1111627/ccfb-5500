@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>门店边缘调度平台</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; margin: 0; background: #f4f5f7; color: #222; }
+  header { background: #1f2d3d; color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 24px; }
+  header h1 { font-size: 16px; margin: 0; }
+  nav button { background: none; border: none; color: #aab; padding: 8px 14px; cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; }
+  nav button.active { color: #fff; border-bottom-color: #4f9cff; }
+  main { padding: 16px 20px; }
+  table { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid #eee; text-align: left; }
+  th { background: #fafbfc; color: #666; font-weight: 600; }
+  .card { background: #fff; border-radius: 6px; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; margin-right: 4px; }
+  .ok { background: #e6f7e9; color: #1a7f37; }
+  .bad { background: #fdecea; color: #c0392b; }
+  .warn { background: #fff7e0; color: #9a6a00; }
+  .info { background: #e8f1fd; color: #2460c9; }
+  .muted { color: #999; font-size: 12px; }
+  input, select { padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+  button.act { background: #2460c9; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
+  #events { height: 70vh; overflow-y: scroll; font-family: monospace; font-size: 12px; background: #14181f; color: #9fd3a8; padding: 10px; border-radius: 6px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  pre.logs { background: #14181f; color: #cde; padding: 10px; border-radius: 6px; max-height: 300px; overflow: auto; font-size: 12px; }
+  h3 { margin: 4px 0 10px; font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏪 门店边缘调度平台</h1>
+  <nav>
+    <button data-tab="nodes" class="active">节点总览</button>
+    <button data-tab="workloads">工作负载</button>
+    <button data-tab="releases">发布单</button>
+    <button data-tab="events">事件流</button>
+    <button data-tab="quotas">配额</button>
+  </nav>
+</header>
+<main>
+  <section id="tab-nodes"></section>
+  <section id="tab-workloads" hidden></section>
+  <section id="tab-releases" hidden></section>
+  <section id="tab-events" hidden><div id="events"></div></section>
+  <section id="tab-quotas" hidden></section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const api = async (p, opt) => (await fetch(p, opt)).json();
+const post = (p, body) => api(p, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  document.querySelectorAll('main section').forEach(s => s.hidden = true);
+  $('#tab-' + b.dataset.tab).hidden = false;
+});
+
+async function renderNodes() {
+  const nodes = await api('/api/nodes');
+  let rows = nodes.map(n => `
+    <tr>
+      <td>${esc(n.store_id)}</td>
+      <td class="muted">${esc(n.node_id.slice(0,8))}</td>
+      <td>${esc(n.region)}</td>
+      <td>${n.online ? '<span class="tag ok">在线</span>' : '<span class="tag bad">离线</span>'}
+          ${n.replaced ? '<span class="tag warn">已更换</span>' : ''}</td>
+      <td>${n.usage.cpu_m}m / ${n.capacity.cpu_m}m<br>${n.usage.mem_mb} / ${n.capacity.mem_mb} MB</td>
+      <td>${(n.assignments||[]).map(a =>
+        `<div>${esc(a.workload)}@${esc(a.actual_version||a.version)}
+         <span class="tag ${a.state==='Running'?'ok':'warn'}">${a.state}</span>
+         ${n.online ? `<a href="#" onclick="showLogs('${n.node_id}','${a.id}');return false">日志</a>` : ''}</div>`).join('')}</td>
+      <td class="muted">${Object.entries(n.labels||{}).map(([k,v])=>k+'='+v).join(' ')} ${(n.taints||[]).map(t=>'⛔'+t).join(' ')}</td>
+      <td class="muted">${esc(n.hours.open||'')}-${esc(n.hours.close||'')} 高峰${esc(n.hours.peak_start||'')}-${esc(n.hours.peak_end||'')}</td>
+    </tr>`).join('');
+  $('#tab-nodes').innerHTML = `<div class="card"><h3>节点 (${nodes.filter(n=>n.online).length}/${nodes.length} 在线)</h3>
+    <table><tr><th>门店</th><th>节点</th><th>区域</th><th>状态</th><th>资源用量</th><th>工作负载</th><th>标签/污点</th><th>营业时间</th></tr>${rows}</table></div>
+    <div class="card" id="logview" style="display:none"><h3>远程日志</h3><pre class="logs" id="logcontent"></pre></div>`;
+}
+
+window.showLogs = async (nodeID, assignID) => {
+  const txt = await (await fetch(`/api/nodes/${nodeID}/logs?id=${encodeURIComponent(assignID)}&lines=50`)).text();
+  $('#logview').style.display = 'block';
+  $('#logcontent').textContent = txt;
+};
+
+async function renderWorkloads() {
+  const [prog, recs] = await Promise.all([api('/api/workloads/progress'), api('/api/recommendations')]);
+  const recMap = Object.fromEntries((recs||[]).map(r => [r.workload, r]));
+  $('#tab-workloads').innerHTML = prog.map(p => {
+    const r = recMap[p.spec.name];
+    const steps = (p.steps||[]).slice(0, 20).map(s =>
+      `<tr><td>${esc(s.store_id)}</td><td class="muted">${esc(s.assignment_id)}</td><td><span class="tag warn">${esc(s.step)}</span></td><td class="muted">${esc(s.reason)}</td></tr>`).join('');
+    return `<div class="card">
+      <h3>${esc(p.spec.name)} <span class="tag info">v${esc(p.spec.version)}</span>
+        <span class="tag ${p.updated===p.desired_total?'ok':'warn'}">${p.updated}/${p.desired_total} 已就绪</span></h3>
+      <div class="muted">副本/店: ${p.spec.replicas} · 请求 ${p.spec.request.cpu_m}m/${p.spec.request.mem_mb}MB ·
+        选择器 ${esc(JSON.stringify(p.spec.node_selector||{}))} · 容忍 ${esc((p.spec.tolerations||[]).join(','))||'无'}
+        ${p.spec.anti_affinity ? ' · 反亲和' : ''}</div>
+      ${r ? `<div class="muted">📊 资源建议 (基于 ${r.samples} 个样本, p95=${r.p95.cpu_m}m/${r.p95.mem_mb}MB): 建议
+        <b>${r.suggested.cpu_m}m/${r.suggested.mem_mb}MB</b> (当前 ${r.current_request.cpu_m}m/${r.current_request.mem_mb}MB)</div>` : ''}
+      ${steps ? `<table><tr><th>门店</th><th>负载</th><th>还差哪一步</th><th>原因</th></tr>${steps}</table>` : '<div class="muted">全部副本已收敛 ✓</div>'}
+    </div>`;
+  }).join('') + `
+  <div class="card"><h3>新建/更新工作负载</h3>
+    <input id="wn" placeholder="名称"> <input id="wv" placeholder="版本" value="1.0.0" size="6">
+    <input id="wr" type="number" placeholder="副本" value="1" style="width:60px">
+    <input id="wcpu" type="number" placeholder="CPU(m)" value="100" style="width:80px">
+    <input id="wmem" type="number" placeholder="内存MB" value="128" style="width:80px">
+    <input id="wsel" placeholder='选择器 {"k":"v"}' size="16">
+    <button class="act" onclick="createWorkload()">提交</button></div>`;
+}
+
+window.createWorkload = async () => {
+  let sel = {}; try { sel = JSON.parse($('#wsel').value || '{}'); } catch(e) { alert('选择器 JSON 错误'); return; }
+  const res = await post('/api/workloads', {
+    name: $('#wn').value, version: $('#wv').value, replicas: +$('#wr').value,
+    cmd: ['workload'], request: {cpu_m: +$('#wcpu').value, mem_mb: +$('#wmem').value},
+    node_selector: sel,
+  });
+  if (res.error) alert(res.error);
+  renderWorkloads();
+};
+
+async function renderReleases() {
+  const [rels, wls] = await Promise.all([api('/api/releases'), api('/api/workloads')]);
+  $('#tab-releases').innerHTML = (rels||[]).map(r => `
+    <div class="card"><h3>${esc(r.id)} · ${esc(r.workload)} → v${esc(r.to_version)}
+      <span class="tag ${{done:'ok',failed:'bad'}[r.status]||'info'}">${esc(r.status)}</span></h3>
+      <div class="muted">试点 ${r.canary_count} 家 · 浸泡 ${r.healthy_accum_sec}/${r.canary_duration_sec}s · 批次 ${r.batch_size} 家 ·
+        已推送 ${(r.store_updates||[]).length} 家</div>
+      <table>${(r.history||[]).map(h =>
+        `<tr><td class="muted">${esc(h.time.replace('T',' ').slice(0,19))}</td><td>${esc(h.phase)}</td><td>${esc(h.store_id)}</td><td>${esc(h.detail)}</td></tr>`).join('')}</table>
+    </div>`).join('') + `
+  <div class="card"><h3>新建发布单</h3>
+    <select id="rlw">${(wls||[]).map(w=>`<option>${esc(w.name)}</option>`).join('')}</select>
+    <input id="rlv" placeholder="目标版本" size="8">
+    <input id="rlc" type="number" placeholder="试点家数" value="3" style="width:80px">
+    <input id="rld" type="number" placeholder="浸泡秒" value="86400" style="width:90px">
+    <input id="rlb" type="number" placeholder="批量" value="10" style="width:60px">
+    <button class="act" onclick="createRelease()">发起发布</button></div>`;
+}
+
+window.createRelease = async () => {
+  const res = await post('/api/releases', {
+    workload: $('#rlw').value, to_version: $('#rlv').value,
+    canary_count: +$('#rlc').value, canary_duration_sec: +$('#rld').value, batch_size: +$('#rlb').value,
+  });
+  if (res.error) alert(res.error);
+  renderReleases();
+};
+
+async function renderQuotas() {
+  const qs = await api('/api/quotas');
+  $('#tab-quotas').innerHTML = `<div class="card"><h3>配额</h3>
+    <table><tr><th>作用域</th><th>最大CPU(m)</th><th>最大内存(MB)</th><th>最大副本数</th></tr>
+    ${(qs||[]).map(q=>`<tr><td>${esc(q.scope)}</td><td>${q.max_cpu_m||'∞'}</td><td>${q.max_mem_mb||'∞'}</td><td>${q.max_replicas||'∞'}</td></tr>`).join('')}</table></div>
+  <div class="card"><h3>设置配额</h3>
+    <input id="qs" placeholder="scope 如 store:S0001 / region:华东 / global" size="34">
+    <input id="qc" type="number" placeholder="CPU(m)" style="width:90px">
+    <input id="qm" type="number" placeholder="内存MB" style="width:90px">
+    <input id="qr" type="number" placeholder="副本数" style="width:80px">
+    <button class="act" onclick="setQuota()">保存</button></div>`;
+}
+
+window.setQuota = async () => {
+  const res = await post('/api/quotas', {scope: $('#qs').value, max_cpu_m: +$('#qc').value, max_mem_mb: +$('#qm').value, max_replicas: +$('#qr').value});
+  if (res.error) alert(res.error);
+  renderQuotas();
+};
+
+// event stream via SSE
+const evBox = () => $('#events');
+const es = new EventSource('/api/events');
+es.onmessage = m => {
+  const e = JSON.parse(m.data);
+  const div = document.createElement('div');
+  div.textContent = `${e.time.replace('T',' ').slice(0,19)} [${e.type}] ${e.message}`;
+  evBox().appendChild(div);
+  evBox().scrollTop = evBox().scrollHeight;
+};
+
+async function tick() {
+  const tab = document.querySelector('nav button.active').dataset.tab;
+  try {
+    if (tab === 'nodes') await renderNodes();
+    else if (tab === 'workloads') await renderWorkloads();
+    else if (tab === 'releases') await renderReleases();
+    else if (tab === 'quotas') await renderQuotas();
+  } catch (e) { /* control plane restarting */ }
+}
+tick();
+setInterval(tick, 2000);
+</script>
+</body>
+</html>
