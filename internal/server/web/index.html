@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BGP 路由策略仿真与验证平台</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">BGP 路由策略仿真验证平台</div>
+  <div class="controls">
+    <label>规模
+      <select id="scale">
+        <option value="small">小规模(200 前缀)</option>
+        <option value="large" selected>大规模(3 万前缀)</option>
+      </select>
+    </label>
+    <button id="btn-generate">生成并加载场景</button>
+    <button id="btn-run" class="primary">跑到收敛</button>
+    <span id="global-status" class="status">未加载</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="topology">拓扑</button>
+  <button class="tab" data-tab="rib">路由表</button>
+  <button class="tab" data-tab="policy">策略编辑</button>
+  <button class="tab" data-tab="fault">故障仿真 / 收敛回放</button>
+  <button class="tab" data-tab="traffic">流量与利用率</button>
+</nav>
+
+<main>
+  <!-- 拓扑 -->
+  <section id="tab-topology" class="tab-panel active">
+    <div class="panel-head">
+      <h2>网络拓扑</h2>
+      <div class="legend">
+        <span><i class="dot core"></i>核心</span>
+        <span><i class="dot rr"></i>路由反射器</span>
+        <span><i class="dot agg"></i>汇聚/高校</span>
+        <span><i class="dot edge"></i>出口</span>
+        <span><i class="dot ext"></i>上游运营商</span>
+        <span><i class="dot down"></i>故障</span>
+      </div>
+    </div>
+    <canvas id="topo-canvas"></canvas>
+    <div id="topo-info" class="info-box">点击节点或链路查看详情</div>
+  </section>
+
+  <!-- 路由表 -->
+  <section id="tab-rib" class="tab-panel">
+    <div class="panel-head">
+      <h2>路由表与选路解释</h2>
+      <div class="filters">
+        <select id="rib-node"></select>
+        <input id="rib-prefix-filter" type="text" placeholder="按前缀过滤，如 100.1.2">
+        <button id="rib-apply">查询</button>
+      </div>
+    </div>
+    <div class="split">
+      <div class="table-wrap">
+        <table id="rib-table">
+          <thead><tr>
+            <th>前缀</th><th>最优来源</th><th>下一跳</th><th>IGP开销</th>
+            <th>LocalPref</th><th>AS路径</th><th>起源</th><th>MED</th><th>RPKI</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="pager">
+          <button id="rib-prev">上一页</button>
+          <span id="rib-page-info"></span>
+          <button id="rib-next">下一页</button>
+        </div>
+      </div>
+      <div id="decision-panel" class="decision">
+        <h3>选路决策逐级解释</h3>
+        <p class="hint">在左侧选择一条前缀，查看为什么选中该路径。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 策略编辑 -->
+  <section id="tab-policy" class="tab-panel">
+    <div class="panel-head"><h2>路由策略编辑（route-map）</h2></div>
+    <div class="policy-layout">
+      <div class="policy-form">
+        <h3>新增 route-map 节点</h3>
+        <label>名称 <input id="pm-name" value="CUSTOM"></label>
+        <label>序号 <input id="pm-seq" type="number" value="10"></label>
+        <fieldset>
+          <legend>匹配条件（AND）</legend>
+          <label>前缀列表（逗号分隔，每行 CIDR）
+            <textarea id="pm-prefixes" rows="3" placeholder="100.0.0.0/16&#10;203.0.0.0/8"></textarea>
+          </label>
+          <label>团体值（ASN:NN）
+            <input id="pm-community" placeholder="65100:10">
+          </label>
+          <label>AS 路径正则
+            <input id="pm-aspath" placeholder="_65100_">
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>动作</legend>
+          <label>设置 LocalPref（留空不改）
+            <input id="pm-lp" type="number" placeholder="300">
+          </label>
+          <label>前置 AS 路径（逗号分隔 ASN）
+            <input id="pm-prepend" placeholder="65000,65000">
+          </label>
+          <label>追加团体（ASN:NN）
+            <input id="pm-addcomm" placeholder="65000:99">
+          </label>
+          <label>结果
+            <select id="pm-result">
+              <option value="permit">permit</option>
+              <option value="deny">deny</option>
+            </select>
+          </label>
+        </fieldset>
+        <label>应用到边缘路由器
+          <select id="pm-router"></select>
+        </label>
+        <div class="form-actions">
+          <button id="pm-apply" class="primary">应用策略并重跑</button>
+        </div>
+      </div>
+      <div class="policy-current">
+        <h3>当前策略对象</h3>
+        <pre id="policy-view">（暂无自定义策略）</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- 故障仿真 / 收敛回放 -->
+  <section id="tab-fault" class="tab-panel">
+    <div class="panel-head">
+      <h2>故障注入与逐轮回放</h2>
+      <div class="controls">
+        <select id="fault-target"></select>
+        <button id="btn-fail-link">断链路</button>
+        <button id="btn-fail-router">断路由器</button>
+        <button id="btn-restore">恢复</button>
+      </div>
+    </div>
+    <div class="replay">
+      <div class="replay-controls">
+        <button id="replay-first">⏮</button>
+        <button id="replay-prev">◀</button>
+        <span id="replay-round">第 0 轮</span>
+        <button id="replay-next">▶</button>
+        <button id="replay-last">⏭</button>
+        <button id="replay-auto">自动播放</button>
+      </div>
+      <div class="replay-stats" id="replay-stats"></div>
+      <canvas id="replay-canvas"></canvas>
+      <div id="replay-diff" class="info-box">选择轮次查看该轮路由表变化。</div>
+    </div>
+  </section>
+
+  <!-- 流量 -->
+  <section id="tab-traffic" class="tab-panel">
+    <div class="panel-head"><h2>上游链路预计利用率</h2>
+      <button id="btn-traffic-refresh" class="primary">按当前选路计算</button>
+    </div>
+    <div id="traffic-bars" class="traffic-bars"></div>
+    <div class="table-wrap">
+      <table id="traffic-table">
+        <thead><tr><th>出口路由器</th><th>上游</th><th>负载(Mbps)</th><th>容量(Mbps)</th><th>利用率</th><th>承载前缀数</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
