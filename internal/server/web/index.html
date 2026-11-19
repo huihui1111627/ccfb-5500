@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BGP 路由策略仿真与验证平台</title>
+<link rel="stylesheet" href="app.css?v=8">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">BGP</span>
+    <span class="title">路由策略仿真与验证平台</span>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="topology" class="active">拓扑</button>
+    <button data-tab="rib">路由表</button>
+    <button data-tab="policy">策略编辑</button>
+    <button data-tab="fault">故障仿真与回放</button>
+    <button data-tab="traffic">流量与出口利用率</button>
+    <button data-tab="verify">场景验证</button>
+  </nav>
+  <div class="netinfo" id="netinfo">加载中…</div>
+</header>
+
+<main>
+  <!-- ============ 拓扑 ============ -->
+  <section id="tab-topology" class="tab active">
+    <div class="panel-row">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h2>网络拓扑</h2>
+          <div class="legend" id="topo-legend"></div>
+        </div>
+        <div class="topo-wrap">
+          <svg id="topo-svg" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </div>
+      <aside class="panel side">
+        <h3>节点详情</h3>
+        <div id="node-detail" class="empty">点击拓扑中的路由器查看详情</div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ 路由表 ============ -->
+  <section id="tab-rib" class="tab">
+    <div class="panel-row">
+      <aside class="panel side narrow">
+        <h3>选择路由器</h3>
+        <input id="rib-search" class="input" placeholder="按名称过滤…">
+        <div id="router-list" class="router-list"></div>
+      </aside>
+      <div class="panel grow">
+        <div class="panel-head">
+          <h2 id="rib-title">路由表</h2>
+          <div class="controls">
+            <input id="rib-prefix" class="input" placeholder="前缀过滤，如 200.16">
+            <button id="rib-prev" class="btn ghost pager">上一页</button>
+            <span id="rib-pageinfo" class="muted" style="white-space:nowrap"></span>
+            <button id="rib-next" class="btn ghost pager">下一页</button>
+          </div>
+        </div>
+        <div class="rib-split">
+          <div class="table-scroll">
+            <table class="grid" id="rib-table">
+              <thead><tr>
+                <th>前缀</th><th>下一跳</th><th>出口</th><th>AS_PATH</th><th>LP</th><th>MED</th>
+                <th>ORIGIN</th><th>RPKI</th><th>ECMP</th><th></th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="rib-decision" class="decision-box hidden"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 策略 ============ -->
+  <section id="tab-policy" class="tab">
+    <div class="panel-row">
+      <aside class="panel side">
+        <h3>策略链</h3>
+        <div id="policy-list" class="policy-list"></div>
+        <div class="button-row">
+          <button id="policy-new" class="btn">新建策略</button>
+          <button id="policy-apply" class="btn primary">应用并重新收敛</button>
+        </div>
+        <div id="policy-result" class="muted"></div>
+      </aside>
+      <div class="panel grow">
+        <div class="panel-head"><h2 id="policy-title">策略编辑器</h2></div>
+        <div id="policy-editor" class="empty">从左侧选择一条策略，或新建一条</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 故障仿真 ============ -->
+  <section id="tab-fault" class="tab">
+    <div class="panel-row">
+      <aside class="panel side">
+        <h3>注入故障</h3>
+        <div class="field">
+          <label>断掉路由器</label>
+          <div id="fault-routers" class="checklist"></div>
+        </div>
+        <div class="field">
+          <label>断掉链路</label>
+          <div id="fault-links" class="checklist"></div>
+        </div>
+        <div class="button-row">
+          <button id="fault-run" class="btn primary">仿真并回放</button>
+          <button id="fault-reset" class="btn ghost">清除故障</button>
+        </div>
+        <div id="fault-result" class="muted"></div>
+      </aside>
+      <div class="panel grow">
+        <div class="panel-head">
+          <h2>收敛回放</h2>
+          <div class="controls">
+            <button id="replay-first" class="btn ghost">⏮</button>
+            <button id="replay-play" class="btn">▶ 播放</button>
+            <input type="range" id="replay-range" min="0" max="0" value="0">
+            <span id="replay-round-label" class="muted">第 0 轮</span>
+          </div>
+        </div>
+        <div class="replay-grid">
+          <div class="replay-stats" id="replay-stats"></div>
+          <div class="table-scroll">
+            <table class="grid" id="replay-table">
+              <thead><tr><th>路由器</th><th>前缀</th><th>事件</th><th>AS_PATH</th><th>LP</th><th>下一跳</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 流量 ============ -->
+  <section id="tab-traffic" class="tab">
+    <div class="panel-row">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h2>上游出口利用率</h2>
+          <div class="controls">
+            <label class="muted">每前缀等效流数</label>
+            <input id="traffic-flows" class="input small" type="number" value="512" min="1" max="10000">
+            <button id="traffic-run" class="btn primary">计算</button>
+          </div>
+        </div>
+        <div id="upstream-bars" class="bars"></div>
+        <h3 style="margin-top:24px">全部链路利用率</h3>
+        <div class="table-scroll">
+          <table class="grid" id="traffic-table">
+            <thead><tr><th>链路</th><th>类型</th><th>容量 (Gbps)</th><th>负载 (Gbps)</th><th>利用率</th><th>状态</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 验证 ============ -->
+  <section id="tab-verify" class="tab">
+    <div class="panel-row">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h2>场景验证</h2>
+          <div class="controls">
+            <button id="verify-run" class="btn primary">运行全部场景</button>
+            <span id="verify-note" class="muted"></span>
+          </div>
+        </div>
+        <p class="muted">
+          对每个场景检查仿真中不出现路由环与黑洞，并统计收敛轮数。故障场景从已收敛的基线出发，
+          因此轮数是该变更的增量收敛成本。
+        </p>
+        <div class="table-scroll">
+          <table class="grid" id="verify-table">
+            <thead><tr><th>场景</th><th>类型</th><th>收敛轮数</th><th>更新数</th><th>已收敛</th><th>黑洞</th><th>路由环</th><th>说明</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<script src="app.js?v=8"></script>
+</body>
+</html>

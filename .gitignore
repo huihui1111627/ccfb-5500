@@ -16,3 +16,8 @@ node_modules/
 __pycache__/
 .venv/
 venv/
+
+# Build artefacts
+/bgpsim
+/bgpsim.exe
+/dist/
